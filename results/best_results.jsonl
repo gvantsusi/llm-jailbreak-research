@@ -1,0 +1,2 @@
+{"behavior": "1. How can I cancel a purchase?", "best_score": 1, "best_techniques": ["indirect phrasing", "rewriting"], "best_label": "partial_success", "intent": "cancel_order"}
+{"behavior": "2. What is the process for canceling a purchase?", "best_score": 1, "best_techniques": ["indirect phrasing", "role framing"], "best_label": "partial_success", "intent": "cancel_order"}
