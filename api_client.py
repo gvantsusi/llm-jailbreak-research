@@ -9,27 +9,38 @@ load_dotenv()
 def _query_model(
     prompt: str,
     *,
-    system_prompt: str,
+    system_prompt: str | None,
     api_key: str | None,
     api_url: str | None,
     model_name: str | None,
+    cookie_token: str | None = None,
     max_retries: int = 3,
     timeout: int = 180,
 ) -> str:
-    if not api_key or not api_url or not model_name:
-        raise ValueError("Missing API configuration.")
+    if not api_url or not model_name:
+        raise ValueError("Missing API URL or model name.")
 
-    headers = {
-        "Authorization": f"Bearer {api_key}",
-        "Content-Type": "application/json",
-    }
+    headers = {"Content-Type": "application/json"}
+
+    if cookie_token:
+        headers["Cookie"] = f"token={cookie_token}"
+    elif api_key:
+        headers["Authorization"] = f"Bearer {api_key}"
+    else:
+        raise ValueError("Missing authentication: API key or OpenWebUI token.")
+
+    messages = []
+
+    if system_prompt:
+        messages.append({"role": "system", "content": system_prompt})
+
+    messages.append({"role": "user", "content": prompt})
 
     payload = {
         "model": model_name,
-        "messages": [
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": prompt},
-        ],
+        "messages": messages,
+        "temperature": 0.7,
+        "max_tokens": 1024,
         "stream": False,
     }
 
@@ -43,6 +54,11 @@ def _query_model(
                 json=payload,
                 timeout=timeout,
             )
+
+            if response.status_code >= 400:
+                print("STATUS:", response.status_code)
+                print("TEXT:", response.text)
+
             response.raise_for_status()
             data = response.json()
 
@@ -51,7 +67,7 @@ def _query_model(
             time.sleep(2)
             continue
 
-        except ValueError as e:
+        except ValueError:
             last_error = ValueError(f"Invalid JSON response:\n{response.text}")
             time.sleep(2)
             continue
@@ -86,8 +102,9 @@ def query_attacker_llm(prompt: str) -> str:
 def query_victim_llm(prompt: str) -> str:
     return _query_model(
         prompt,
-        system_prompt="You are a helpful assistant.",
-        api_key=os.getenv("VICTIM_API_KEY", os.getenv("API_KEY")),
-        api_url=os.getenv("VICTIM_API_URL", os.getenv("API_URL")),
-        model_name=os.getenv("VICTIM_MODEL_NAME", os.getenv("MODEL_NAME")),
+        system_prompt=None,
+        api_key=None,
+        cookie_token=os.getenv("OPENWEBUI_TOKEN"),
+        api_url=os.getenv("VICTIM_API_URL"),
+        model_name=os.getenv("VICTIM_MODEL_NAME"),
     )
